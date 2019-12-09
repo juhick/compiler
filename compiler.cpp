@@ -443,6 +443,9 @@ void statement(int* ptx, int lev, bool isOut) {
 		if (sym == ident) {
 			getsym();
 		}
+		else {
+			cout << "缺少变量名" << endl;
+		}
 		//若含有','，则是多变量
 		if (sym == comma) {
 			vardeclaration(ptx, lev, &dx);
@@ -462,12 +465,16 @@ void statement(int* ptx, int lev, bool isOut) {
 			vardeclaration(ptx, lev, &dx);
 			gen(INT, 0, 1);
 		}
+		else {
+			cout << "缺少分号" << endl;
+		}
 	}//标识符处理
 	else if (sym == ident) {
+		bool isBecome = false;
 		i = position(id, *ptx);
 		if (i == 0)
 		{
-			cout << "未找到变量" << endl;
+			cout << "变量或函数未声明" << endl;
 		}
 		else {
 			//如果为变量，则为赋值
@@ -475,6 +482,7 @@ void statement(int* ptx, int lev, bool isOut) {
 			{
 				getsym();
 				if (sym == becomes) {
+					isBecome = true;
 					getsym();
 				}
 				else {
@@ -483,8 +491,8 @@ void statement(int* ptx, int lev, bool isOut) {
 			}
 			//否则直接进行表达式处理
 			expression(ptx, lev);
-			//若不是函数调用则将值送到变量中
-			if (i != 0 && table[i].kind != function) {
+			//如果是赋值,则将值赋给变量
+			if (i != 0 && isBecome) {
 				gen(STO, lev - table[i].level, table[i].addr);
 			}
 		}
@@ -501,10 +509,13 @@ void statement(int* ptx, int lev, bool isOut) {
 				i = position(id, *ptx);
 			}
 			else {
-				i = 0;
+				i = -1;
 			}
 			if (i == 0) {
-				cout << "未找到变量" << endl;
+				cout << "变量未声明" << endl;
+			}
+			else if (i == -1) {
+				cout << "缺少变量名" << endl;
 			}
 			else {
 				//开始读取输入
@@ -524,6 +535,9 @@ void statement(int* ptx, int lev, bool isOut) {
 		getsym();
 		if (sym == lparen) {
 			getsym();
+			if (sym != ident) {
+				cout << "缺少变量名" << endl;
+			}
 			//进行表达式处理
 			expression(ptx, lev);
 			//开始输出
@@ -543,6 +557,9 @@ void statement(int* ptx, int lev, bool isOut) {
 		getsym();
 		if (sym == lparen) {
 			getsym();
+			if (sym != ident) {
+				cout << "缺少变量名" << endl;
+			}
 			expression(ptx, lev);
 			if (sym != rparen) {
 				cout << "缺少右括号" << endl;
@@ -590,6 +607,9 @@ void statement(int* ptx, int lev, bool isOut) {
 		getsym();
 		if (sym == lparen) {
 			getsym();
+			if (sym != ident) {
+				cout << "缺少变量名" << endl;
+			}
 			expression(ptx, lev);
 			//保存需要跳转的语句地址
 			cx2 = cx;
@@ -629,7 +649,7 @@ void statement(int* ptx, int lev, bool isOut) {
 			if (sym == rbrace) lp--;
 			statement(ptx, lev, false);
 		}
-		//如果函数无返回值且为显式写出return
+		//如果函数无返回值且未显式写出return
 		if (!hasReturn && isOut) {
 			gen(RET, 0, 0);
 		}
@@ -641,10 +661,13 @@ void statement(int* ptx, int lev, bool isOut) {
 		if (sym == semicolon) {
 			gen(RET, 0, 0);
 		}//有返回值
-		else {
+		else if (sym == ident) {
 			expression(ptx, lev);
 			gen(STO, 1, rt);
 			gen(RET, 0, 0);
+		}
+		else {
+			cout << "return后缺少变量或分号" << endl;
 		}
 	}
 }
@@ -740,17 +763,19 @@ int block(int lev, int tx) {
 						else {
 							gen(INT, 0, dx);
 						}
-
 						getsym();
 					}
 					else {
-						cout << "缺少分号" << endl;
+						cout << "变量后缺少分号" << endl;
 					}
 
 				}//若是单个变量
 				else if (sym == semicolon) {
 					vardeclaration(&tx, lev, &dx);
 					getsym();
+				}
+				else {
+					cout << "变量后缺少分号" << endl;
 				}
 			}
 			else if (sym == _void) {
@@ -801,6 +826,9 @@ int block(int lev, int tx) {
 					cout << "缺少左括号" << endl;
 				}
 			}
+		}
+		else {
+			cout << "缺少类型识别符" << endl;
 		}
 
 	} while (!isOver);//直到文件读完
