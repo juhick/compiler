@@ -38,7 +38,6 @@ bool isMain();
 
 int main() {
 	init();
-	err = 0;//初始化错误数
 	cc = cx = ll = 0;
 	ch = ' ';
 	getsym();
@@ -195,6 +194,9 @@ int getsym()
 				a[k] = ch;
 				k++;
 			}
+			else {
+				cout << "标识符过长" << endl;
+			}
 			getch();
 		} while (ch >= 'a' && ch <= 'z' || ch >= '0' && ch <= '9' || ch == '_' || ch >= 'A' && ch <= 'Z');
 		//可以包含字母，下划线和数字
@@ -225,7 +227,7 @@ int getsym()
 			sym = ident;
 		}
 	}//如果是数字
-	else if (ch >= '0' && ch <= '9')
+	else if (ch > '0' && ch <= '9')
 	{
 		k = 0;//记录数字的位数
 		num = 0;
@@ -241,7 +243,7 @@ int getsym()
 		if (k > nmax)
 		{
 			//error(30);
-			//cout << "error" << endl;
+			cout << "数字太长" << endl;
 		}
 	}//赋值号
 	else if (ch == '=')
@@ -304,6 +306,7 @@ int term(int* ptx, int lev)//项处理
 int expression(int* ptx, int lev)//表达式处理
 {
 	enum symbol addop;//用于保存正负号
+	bool isNeg = false;
 	if (sym == _plus || sym == _minus)
 	{
 		addop = sym;
@@ -311,9 +314,8 @@ int expression(int* ptx, int lev)//表达式处理
 		term(ptx, lev);
 		if (addop == _minus)
 		{
+			isNeg = true;
 			gen(LIT, 0, 0);
-			gen(LIT, 0, sym);//若开头为负号，则生成取负指令
-			gen(SUB, 0, 0);
 		}
 	}
 	else
@@ -334,18 +336,22 @@ int expression(int* ptx, int lev)//表达式处理
 			gen(SUB, 0, 0);//生成减法指令
 		}
 	}
+	if (isNeg)
+	{
+		gen(SUB, 0, 0);
+	}
 	return 0;
 }
 
 int factor(int* ptx, int lev)//因子处理
 {
 	int i;
-	if (sym == ident)//因子为常量或变量
+	if (sym == ident)//因子变量或函数
 	{
 		i = position(id, *ptx);//查找名字
 		if (i == 0)//返回0，没找到
 		{
-			error(11);//标识符未声明
+			cout << "标识符未声明" << endl;
 		}
 		else
 		{
@@ -377,11 +383,6 @@ int factor(int* ptx, int lev)//因子处理
 	}
 	else if (sym == number)//因子为数
 	{
-		if (num > amax)
-		{
-			error(31);
-			num = 0;
-		}
 		//将常数入栈
 		gen(LIT, 0, num);
 		getsym();
@@ -397,13 +398,20 @@ int factor(int* ptx, int lev)//因子处理
 		}
 		else
 		{
-			error(22);//缺少右括号
+			cout << "缺少右括号" << endl;
 		}
 	}
 	return 0;
 }
 
 void enter(enum symbol k, int* ptx, int lev, int* pdx, int type) {
+	int i = position(id, *ptx);
+	if (i != 0) {
+		if (table[i].level == lev) {
+			cout << "变量或函数" << id << "重定义" << endl;
+			exit(0);
+		}
+	}
 	(*ptx)++;
 	table[(*ptx)].name = id;
 	table[(*ptx)].kind = k;
@@ -422,14 +430,6 @@ void enter(enum symbol k, int* ptx, int lev, int* pdx, int type) {
 	default:
 		break;
 	}
-}
-
-void error(int n) {
-	char space[81];
-	memset(space, 32, 81);
-	space[cc - 1] = 0;
-	cout << "****" << space << "!" << n << endl;
-	err++;
 }
 
 void statement(int* ptx, int lev, bool isOut) {
@@ -666,6 +666,12 @@ void statement(int* ptx, int lev, bool isOut) {
 			gen(STO, 1, rt);
 			gen(RET, 0, 0);
 		}
+		else if (sym == number)
+		{
+			gen(LIT, 0, num);
+			gen(STO, 1, rt);
+			gen(RET, 0, 0);
+		}
 		else {
 			cout << "return后缺少变量或分号" << endl;
 		}
@@ -717,9 +723,9 @@ int block(int lev, int tx) {
 						cm = cx - 1;
 						gen(RET, 0, 0);
 						rt = 0;
-						lev++;
 						flag = true;
 					}
+					lev++;
 					gen(JMP, 0, cx + 1);
 					enter(function, &tx, lev, &dx, _int);
 					getsym();
@@ -762,6 +768,7 @@ int block(int lev, int tx) {
 						}
 						else {
 							gen(INT, 0, dx);
+							lev++;
 						}
 						getsym();
 					}
@@ -772,6 +779,7 @@ int block(int lev, int tx) {
 				}//若是单个变量
 				else if (sym == semicolon) {
 					vardeclaration(&tx, lev, &dx);
+					lev++;
 					getsym();
 				}
 				else {
@@ -786,9 +794,9 @@ int block(int lev, int tx) {
 					cm = cx - 1;
 					gen(RET, 0, 0);
 					rt = 0;
-					lev++;
 					flag = true;
 				}
+				lev++;
 				getsym();
 				if (sym == ident) {
 					//判断是主函数就处理全局里主函数的跳转
